@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-Content-Type-Options" content="nosniff">
+      <meta http-equiv="X-Frame-Options" content="DENY">
+      <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+      <style>
+        @font-face {
+          font-family: 'TTNormsPro';
+          src: url('https://readyhubb.com/_next/static/media/TT%20Norms%20Pro%20Regular.0a623c8d.ttf');
+          font-weight: normal;
+          font-style: normal;
+        }
+        * { font-family: 'TTNormsPro', sans-serif; }
+        html, body {
+          // overflow: hidden !important;
+          // overscroll-behavior: none !important;
+          font-family: 'TTNormsPro', sans-serif;
+        }
+        #card-element { height: 40px; padding: 10px; border: 0px solid red; }
+        .sb-btn {
+          background: #F36A46;
+          padding: 15px;
+          border-radius: 10px;
+          color: #FFFFFF;
+          border-width: 0;
+          display: block;
+          margin: 0 auto;
+          margin-top: 20px;
+          width: 200px;
+          font-weight: bold;
+          font-size: 18px;
+        }
+        #btn-enable{ opacity: 1; }
+        #btn-disable{ opacity: 0.5; }
+        /* Loading spinner styles */
+        .loader {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          border: 4px solid #F3F3F3;
+          border-radius: 50%;
+          border-top: 4px solid #F36A46;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: translate(-50%, -50%) rotate(0deg); }
+          100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        /* Hidden content initially */
+        #stripe-form {
+          display: none;
+        }
+          #card-element {
+            padding-top: 20px;
+            //height: 30px;
+            padding-bottom: 0px;
+            margin-top: 20px;
+            border: 1px solid #E0E0E0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+          }
+      </style>
+      <!-- Preconnect to Stripe CDN -->
+      <link rel="preconnect" href="https://js.stripe.com">
+      <link rel="dns-prefetch" href="https://js.stripe.com">
+    </head>
+    <body>
+      <div class="loader"></div>
+      <form id="stripe-form">
+        <p>Card info</p>
+        <div id="card-element"></div>
+        <div id="address-element"></div>
+        <input type="checkbox" id="set-default" name="set-default" style="margin-top: 20px; " /> Save as default
+        <button class="sb-btn" style="padding: 10px; margin-top: 20px;">Save Card</button>
+      </form>
+      <script src="https://js.stripe.com/v3/"></script>
+      <script>
+        // Add error handling
+        window.onerror = function(message, source, lineno, colno, error) {
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify({ type: 'error', error: message })
+          );
+        };
+        // Show loader immediately
+        const loader = document.querySelector('.loader');
+        const stripeForm = document.getElementById('stripe-form');
+        // Progressive loading check
+        function stripeLoadedCheck() {
+          return new Promise((resolve, reject) => {
+            if (window.Stripe) {
+              resolve();
+            } else {
+              let attempts = 0;
+              const interval = setInterval(() => {
+                if (window.Stripe) {
+                  clearInterval(interval);
+                  resolve();
+                } else if (attempts++ > 10) {
+                  clearInterval(interval);
+                  reject(new Error('Stripe.js timeout'));
+                }
+              }, 100);
+            }
+          });
+        }
+        function finalizeLoading() {
+          // Hide loader
+          loader.style.display = 'none';
+          // Show form
+          stripeForm.style.display = 'block';
+          // Notify React Native
+          // window.ReactNativeWebView.postMessage(JSON.stringify({
+          //   type: 'stripe_ready'
+          // }));
+        }
+        const sendToApp = (data) =>{
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify(data)
+          );
+        }
+        document.addEventListener('DOMContentLoaded', async () => {
+          try {
+            await stripeLoadedCheck();
+            // Test Stripe load
+            if(!window.Stripe) {
+              sendToApp({ type: 'error', error: 'Stripe.js not loaded' });
+              // document.getElementById("card-element").setHTMLUnsafe('Stripe.js not loaded');
+              throw new Error('Stripe.js not loaded');
+            }
+            const appearance = {
+              theme: 'stripe',
+              variables: {
+                colorPrimary: '#F36A46',
+                colorText: '#1F2937',
+                colorBackground: '#FFFFFF',
+                colorDanger: '#EF4444',
+                spacingUnit: '4px',
+                borderRadius: '8px',
+                fontSizeBase: '16px',
+                fontFamily: 'TTNormsPro',
+              },
+              rules: {
+                '.Input': {
+                  border: '1px solid #E0E0E0',
+                  padding: '12px',
+                  boxShadow: 'none',
+                  transition: 'border-color 0.2s ease',
+                  fontFamily: 'TTNormsPro',
+                },
+                '.Input:hover': {
+                  borderColor: '#6366F1'
+                },
+                '.Input--invalid': {
+                  color: '#EF4444',
+                  borderColor: '#EF4444'
+                },
+                '.Label': {
+                  marginBottom: '4px',
+                  fontWeight: '500',
+                  fontFamily: 'TTNormsPro',
+                },
+                '.Error': {
+                  fontSize: '14px',
+                  marginTop: '4px',
+                  fontFamily: 'TTNormsPro',
+                }
+              }
+            };
+            const stripe = Stripe('pk_test_51Ip5vuLK942Low44Lvw37agsEH8Ek0PhyUk0waEACcIea4eEPonXyixCViU4i1APuhlZWVbZjTBXnHZdOFyqbPg100F9wd9S6A');
+            const elements = stripe.elements({
+              appearance: appearance,
+              fonts:[
+                {
+                  family: 'TTNormsPro',
+                  src: 'url(https://readyhubb.com/_next/static/media/TT%20Norms%20Pro%20Regular.0a623c8d.ttf)',
+                  weight: '500',
+                },
+              ]
+            });
+            // Card element
+            const cardElement = elements.create('card', {
+            hidePostalCode: true,
+            appearance: appearance,
+            style: {
+              base: {
+                  color: '#32325D',
+                  fontFamily: 'TTNormsPro',
+                  fontSmoothing: 'antialiased',
+                  fontSize: '16px',
+                  '::placeholder': {
+                      color: '#AAB7C4'
+                  }
+              },
+              invalid: {
+                  color: '#FA755A',
+                  iconColor: '#FA755A'
+              }
+            }
+            });
+            // Test element creation
+            if(!cardElement) {
+              throw new Error('Element creation failed');
+            }
+            cardElement.mount('#card-element');
+            // Address Element
+            const addressElement = elements.create('address', {
+              mode: 'billing',
+              defaultValues: {
+                // name: 'John Doe'
+              }
+            });
+            addressElement.mount('#address-element');
+            cardElement.on('ready', () => {
+              // elementsCreated = true;
+              finalizeLoading();
+            });
+            const submitBtn = document.getElementsByClassName("sb-btn")[0]
+            let isSubmitBtnEnabled = true
+            const enableSubmitBtn = () => {
+              isSubmitBtnEnabled = true
+              submitBtn.id="btn-enable"
+            }
+            const disableSubmitBtn = () => {
+              isSubmitBtnEnabled = false
+              submitBtn.id="btn-disable"
+            }
+            window.addEventListener('message', (event) => {
+              if (event.data.type === 'FROM_APP') {
+                console.log('Received from RN:', event.data.payload);
+                // Update UI or process data
+                enableSubmitBtn();
+              }
+            });
+            const form = document.getElementById('stripe-form');
+            form.addEventListener('submit', async (e) => {
+              e.preventDefault();
+              if(!isSubmitBtnEnabled) return;
+              const setDefault = document.getElementById('set-default').checked;
+              // if(setDefault){
+              //   sendToApp({ type: 'error', error: 'Set Default is required.' });
+              //   return;
+              // }
+              disableSubmitBtn();
+              const { error: addressError, value: address } = await addressElement.getValue();
+              if (addressError) {
+                window.ReactNativeWebView.postMessage(
+                  JSON.stringify({ type: 'error', error: addressError.message })
+                );
+                enableSubmitBtn();
+                return;
+              }
+              const { error, paymentMethod } = await stripe.createPaymentMethod({
+                type: 'card',
+                card: cardElement,
+                billing_details: address
+              });
+              if (error) {
+                window.ReactNativeWebView.postMessage(
+                  JSON.stringify({ type: 'error', error: error.message })
+                );
+                enableSubmitBtn();
+              } else {
+                window.ReactNativeWebView.postMessage(
+                  JSON.stringify({ type: 'paymentMethod', paymentMethod: paymentMethod, setDefault: setDefault })
+                );
+              }
+              // enableSubmitBtn();
+            });
+          } catch (error) {
+            enableSubmitBtn();
+            window.ReactNativeWebView.postMessage(
+              JSON.stringify({ type: 'error', error: error.message })
+            );
+          }
+        });
+      </script>
+    </body>
+    </html>
